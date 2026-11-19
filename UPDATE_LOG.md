@@ -159,6 +159,9 @@
 | `D:\major project\client\paillier_client.py` | Paillier key management, vector encryption/decryption, dataset encryption to parquet |
 | `D:\major project\client\extract_and_encrypt.py` | End-to-end CLI: load dataset → extract features → encrypt → save parquet for Colab |
 | `D:\major project\client\requirements.txt` | Dependencies: phe, opencv, numpy, pandas, pyarrow, tqdm |
+| `D:\major project\client\client_compute_gradients.py` | Client-assisted gradient computation for encrypted SGD |
+| `D:\major project\client\client_domain_adaptation.py` | Client-side Procrustes adaptation (computes Enc(A), Enc(b)) |
+| `D:\major project\client\client_decrypt_evaluate.py` | Decrypt predictions, compute AUC/metrics |
 
 ### Client Pipeline
 
@@ -185,6 +188,68 @@ python extract_and_encrypt.py --dataset-root D:\major_project_datasets --dataset
 - **Features encrypted per-dimension** — each float scaled to int (×1e6) then encrypted
 - **Output: Parquet** — efficient columnar storage for encrypted vectors
 - **Dataset indexer** — handles CASIA, Korus, COVERAGE, IMD2020, MICC structures
+
+---
+
+## Colab-Side Implementation (Created 2026-11-19)
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `D:\major project\colab\paillier_server.py` | Server-side Paillier ops: encrypted dot product, linear forward, sigmoid, linear map apply |
+| `D:\major project\colab\encrypted_training.ipynb` | Phase 1: Encrypted SGD on CASIA (client-assisted sigmoid) |
+| `D:\major project\colab\encrypted_adaptation.ipynb` | Phase 2: Encrypted domain adaptation (CASIA → Korus/MICC) |
+| `D:\major project\colab\encrypted_inference.ipynb` | Phase 3: Encrypted test on COVERAGE/IMD2020 |
+
+### Colab Workflow
+
+```bash
+# 1. Upload to Google Drive:
+# MyDrive/major_project/
+#   colab/paillier_server.py
+#   colab/encrypted_training.ipynb
+#   colab/encrypted_adaptation.ipynb
+#   colab/encrypted_inference.ipynb
+#   data/enc_casia.parquet
+#   data/enc_korus.parquet
+#   data/enc_micc.parquet
+#   data/enc_coverage_test.parquet
+#   data/enc_imd2020_test.parquet
+#   data/public_key_for_colab.json
+```
+
+```python
+# 2. In each Colab notebook - first cell:
+from google.colab import drive
+drive.mount('/content/drive')
+import sys
+sys.path.append('/content/drive/MyDrive/major_project/colab')
+from paillier_server import PaillierServer
+server = PaillierServer(public_key_path='/content/drive/MyDrive/major_project/data/public_key_for_colab.json')
+```
+
+### Training Protocol (Client-Assisted)
+
+1. **Server (Colab):** Computes `Enc(logits) = Enc(x) · w + b` for batch
+2. **Server:** Saves batch (Enc(logits), Enc(labels), weights, bias) to Drive
+3. **Client (local):** Runs `client_compute_gradients.py` → decrypts, computes gradients, encrypts gradients
+4. **Client:** Uploads encrypted gradients to Drive
+5. **Server:** Reads gradients, updates `w ← w - η * ∇L`
+6. **Repeat** for all batches/epochs
+
+### Domain Adaptation Protocol
+
+1. **Client (local):** Runs `client_domain_adaptation.py` → decrypts adaptation samples, computes Procrustes A, b, encrypts them
+2. **Client:** Uploads `Enc(A_korus)`, `Enc(b_korus)`, `Enc(A_micc)`, `Enc(b_micc)` to Drive
+3. **Server (Colab):** During inference, applies `Enc(x_target) → Enc(x_target * A + b)` via `encrypted_linear_map_apply()`
+
+### Inference Protocol
+
+1. **Server (Colab):** Runs `encrypted_inference.ipynb` on COVERAGE/IMD2020
+2. **Server:** Applies adaptation (if available) → encrypted forward pass → encrypted sigmoid
+3. **Server:** Saves `Enc(predictions)` to Drive
+4. **Client (local):** Runs `client_decrypt_evaluate.py` → decrypts, computes AUC/per-forgery metrics
 
 ---
 

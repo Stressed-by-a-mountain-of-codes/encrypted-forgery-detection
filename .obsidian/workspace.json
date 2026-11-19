@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "datasets/00_FINAL_SELECTION_5_DATASETS.md",
+                "file": "UPDATE_LOG.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "00_FINAL_SELECTION_5_DATASETS"
+              "title": "UPDATE_LOG"
             }
           }
         ]
@@ -83,7 +83,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "9c96ee8bbd73745e",
@@ -187,9 +188,13 @@
   },
   "active": "a611ce344aa8e3ef",
   "lastOpenFiles": [
+    "papers/15_selective_encryption_forensics_privacy.md",
+    "papers/00_MASTER_INDEX.md",
+    "datasets/04_imd2020.md",
     "datasets/00_DATASET_MASTER_INDEX.md",
-    "image_forgery_detection_research_base.md",
+    "UPDATE_LOG.md",
     "papers/02_comprint_compression_fingerprint.md",
+    "image_forgery_detection_research_base.md",
     "papers/11_ifed_lefnd_foundational.md",
     "papers/07_cmfdformer_transformer_continual.md",
     "papers/14_secdfdnet_deepfake_secret_sharing.md",
