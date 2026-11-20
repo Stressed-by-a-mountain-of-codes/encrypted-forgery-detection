@@ -255,3 +255,152 @@ server = PaillierServer(public_key_path='/content/drive/MyDrive/major_project/da
 
 ## Tags
 #encrypted-domain #forgery-detection #paillier #domain-adaptation #cross-dataset-generalization #colab-free #novel-contribution
+
+---
+
+## Next Phase: Dataset Preparation & Execution (Pending)
+
+### Dataset Download Status
+
+| Dataset | Access Method | Direct Link | Status |
+|---------|---------------|-------------|--------|
+| **CASIA v1/v2** | Academic request | http://forensics.idealtest.org/ | ⏳ Request needed |
+| **Korus 2018** | Direct download | https://github.com/pkorus/korus2018-dataset | ✅ Ready |
+| **COVERAGE** | Direct download | https://github.com/SCLBD/COVERAGE | ✅ Ready (large) |
+| **IMD2020** | Direct download | https://github.com/imd2020/IMD2020 | ✅ Ready |
+| **MICC-F600** | Direct download | http://micc.unifi.it/MICC-F600/ | ✅ Ready |
+
+### CASIA Request Template
+
+```
+To: forensics@idealtest.org
+Subject: CASIA v1/v2 Dataset Access Request
+
+Dear CASIA Team,
+
+I am a graduate student researching encrypted-domain image forgery detection.
+I would like to request access to the CASIA v1 and v2 datasets for academic research.
+
+Project: "Encrypted Domain Adaptation for Cross-Dataset Forgery Detection Generalization"
+Institution: [Your Institution]
+Advisor: [Advisor Name]
+Expected publication: [Conference/Journal]
+
+Thank you for your consideration.
+```
+
+### Execution Checklist
+
+#### Step 1: Local Environment Setup
+- [ ] `cd client && pip install -r requirements.txt`
+- [ ] Verify `python forensic_features.py test_image.jpg` works
+- [ ] Generate Paillier keys: `python -c "from paillier_client import PaillierClient; c=PaillierClient(); c.generate_keys(); c.save_keys('keys/public_key.json','keys/private_key.json')"`
+
+#### Step 2: Dataset Download & Organization
+- [ ] Create `D:\major_project_datasets\` with subdirs:
+  ```
+  major_project_datasets/
+  ├── CASIA_v2/
+  │   ├── Au/ (authentic)
+  │   └── Tp/ (tampered)
+  ├── Korus_2018/
+  ├── COVERAGE/
+  ├── IMD2020/
+  └── MICC_F600/
+  ```
+- [ ] Download Korus, IMD2020, MICC-F600 (direct links above)
+- [ ] Submit CASIA request (can take 1-3 days)
+
+#### Step 3: Feature Extraction & Encryption
+- [ ] Run for each dataset:
+  ```bash
+  python extract_and_encrypt.py --dataset-root D:\major_project_datasets --dataset CASIA_v2 --output ..\colab_data\enc_casia.parquet --generate-keys
+  python extract_and_encrypt.py --dataset-root D:\major_project_datasets --dataset Korus_2018 --output ..\colab_data\enc_korus.parquet
+  python extract_and_encrypt.py --dataset-root D:\major_project_datasets --dataset MICC_F600 --output ..\colab_data\enc_micc.parquet
+  python extract_and_encrypt.py --dataset-root D:\major_project_datasets --dataset COVERAGE --output ..\colab_data\enc_coverage_test.parquet --max-samples 2000
+  python extract_and_encrypt.py --dataset-root D:\major_project_datasets --dataset IMD2020 --output ..\colab_data\enc_imd2020_test.parquet --max-samples 2000
+  ```
+- [ ] Verify outputs: `enc_casia.parquet`, `enc_korus.parquet`, etc.
+
+#### Step 4: Google Drive Upload
+- [ ] Create `MyDrive/major_project/` structure:
+  ```
+  MyDrive/major_project/
+  ├── colab/
+  │   ├── paillier_server.py
+  │   ├── encrypted_training.ipynb
+  │   ├── encrypted_adaptation.ipynb
+  │   ├── encrypted_inference.ipynb
+  │   └── requirements.txt
+  └── data/
+      ├── enc_casia.parquet
+      ├── enc_korus.parquet
+      ├── enc_micc.parquet
+      ├── enc_coverage_test.parquet
+      ├── enc_imd2020_test.parquet
+      └── public_key_for_colab.json
+  ```
+
+#### Step 5: Colab Execution (Sequential)
+- [ ] **Notebook 1:** `encrypted_training.ipynb` — Encrypted SGD on CASIA
+  - Mount Drive, run cells
+  - When client batch saved: run `client_compute_gradients.py` locally, upload gradients
+  - Repeat until convergence
+  - Saves `enc_model_casia.json`
+- [ ] **Notebook 2:** `encrypted_adaptation.ipynb` — Domain adaptation
+  - Run client request cell
+  - Run `client_domain_adaptation.py` locally → uploads `enc_A_korus.parquet`, `enc_b_korus.parquet`, etc.
+  - Server loads and verifies
+- [ ] **Notebook 3:** `encrypted_inference.ipynb` — Generalization test
+  - Runs on COVERAGE + IMD2020
+  - Saves `enc_preds_coverage.parquet`, `enc_preds_imd2020.parquet`
+
+#### Step 6: Client Evaluation
+- [ ] Download prediction files from Drive
+- [ ] Run: `python client_decrypt_evaluate.py --keys-dir keys --preds-coverage enc_preds_coverage.parquet --preds-imd2020 enc_preds_imd2020.parquet --labels-coverage ... --labels-imd2020 ... --output-dir results/`
+- [ ] Review `metrics_coverage.json`, `metrics_imd2020.json`
+
+### Expected Outputs
+
+| Output | Location | Description |
+|--------|----------|-------------|
+| Encrypted model | `data/enc_model_casia.json` | Trained weights (plaintext on server) |
+| Adaptation matrices | `data/enc_A_*.parquet`, `enc_b_*.parquet` | Encrypted domain maps |
+| Encrypted predictions | `data/enc_preds_*.parquet` | Encrypted probabilities |
+| Metrics | `results/metrics_*.json` | AUC, Acc, Prec, Rec, F1 per dataset |
+
+### Known Limitations & Mitigations
+
+| Limitation | Mitigation |
+|------------|------------|
+| Client-assisted sigmoid (round-trips) | Batch size 32, ~1000 samples = ~30 round-trips/epoch |
+| Linear sigmoid approx (degree=1) | Acceptable for logits in [-4,4]; monitor calibration |
+| Encrypted domain adaptation needs client compute | One-time cost; adaptation matrices reused |
+| Colab Free 12hr limit | Checkpoint every epoch; resume from Drive |
+| Paillier slow for high-dim (304) | Feature selection (PCA) or batching; 304 is manageable |
+
+### Future Enhancements (Post-MVP)
+
+- [ ] Feature selection to reduce 304 → 100 dims (faster encryption)
+- [ ] Polynomial sigmoid degree=3 with client-assisted x², x³
+- [ ] Encrypted ensemble (multiple specialized detectors)
+- [ ] CKKS/FHE migration if Colab Pro+ available
+- [ ] Synthetic data augmentation for domain adaptation
+- [ ] Per-forgery-type evaluation (splicing vs copy-move vs removal)
+
+---
+
+## Session Continuity
+
+**To resume in new session:**
+1. Clone repo: `git clone https://github.com/Stressed-by-a-mountain-of-codes/encrypted-forgery-detection.git`
+2. Read `UPDATE_LOG.md` — this file
+3. Check GitHub Issues for any tracked blockers
+4. Continue from next unchecked item above
+
+---
+
+## GitHub Repository
+**https://github.com/Stressed-by-a-mountain-of-codes/encrypted-forgery-detection** (Public)
+
+All code, logs, and dataset analyses committed.
