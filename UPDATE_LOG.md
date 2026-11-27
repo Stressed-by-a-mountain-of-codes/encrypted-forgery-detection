@@ -270,6 +270,19 @@ server = PaillierServer(public_key_path='/content/drive/MyDrive/major_project/da
 | **IMD2020** | Direct download | https://github.com/imd2020/IMD2020 | ✅ Ready |
 | **MICC-F600** | Direct download | http://micc.unifi.it/MICC-F600/ | ✅ Ready |
 
+### Download Script
+
+Run locally to fetch Korus, IMD2020, COVERAGE, MICC-F600:
+
+```bash
+cd client
+python download_datasets.py --root D:\major_project_datasets --datasets all
+# Or selectively:
+python download_datasets.py --datasets korus imd2020 micc coverage
+```
+
+Creates directory structure and attempts git clone / HTTP download for each.
+
 ### CASIA Request Template
 
 ```
